@@ -1,37 +1,46 @@
 # Vue Virtual Scroll Table
 
-Vue template component that applies a sliding window to render the visible rows only.
+Vue template component that applies a sliding window to only render visible rows.
 
-This project is heavilly inspired in [vue-auto-virtual-scroll-list](https://github.com/cristovao-trevisan/vue-auto-virtual-scroll-list) for virtual lists.
+This project was inspired by [vue-virtual-scroller](https://github.com/Akryum/vue-virtual-scroller) and [vue-auto-virtual-scroll-list](https://github.com/cristovao-trevisan/vue-auto-virtual-scroll-list). 
+
+## Index
+
+* [How it works](#how-it-works)
+* [Properties](#properties)
+* [Slots](#slots)
+* [Example](#example)
 
 ## How it works
-Given a fixed row size and the table height, this component calculates the starting and ending index of an array of rows to render (sliding window). The position of the window is adjusted accordingly to the scroll position.
+Given a fixed row size and the table height, this component calculates the starting and ending index of an array of rows to render (a sliding window). The position of the window is adjusted accordingly to the scroll position.
 
-**Important** Note that this component **does not render the main content of the table**. The main and only purpose is to provide the necessary tool to manage the position and size of the sliding window.
+**Important** Note that this component **does not render the main content of the table**. The main and only purpose is to provide the necessary tool to manage the position and size of the sliding window. The main content can be rendered with the slots described in the section [Slots](#slots).
 
 ## Properties
 | Name | Type | Required | Default | Description |
 |-----|---|---|---|---|
-| rows | Array  | yes | [] | Array of data |
+| items | Array  | yes | [] | Array of data |
 | itemSize | Number  | no | 48 | Row size in pixels. This is used to calculate the sliding window of visible rows |
 | preRenderSize | Number | no | 5 | Number of items to render outside of the sliding window (before and after) |
 
 ## Slots
 
-In total there are four `v-slot`'s provided. The most important is the `v-slot:rows`. Make sure that the rendered rows in this slot have the specified `itemSize`.
+In total there are five `v-slot`'s provided where the most relevant is the `v-slot:row`. Make sure that the rendered rows in this slot have the specified `itemSize`.
 
 | Name | Base Tag | Description |
 |-----|---|---|
 | colgroup | `<colgroup>` | Slot to render the `colgroup` tag |
 | header | `<thead>` | Slot to render the `thead` tag |
-| rows | List of `<tr>` | Slot to render the table rows. The content should be a list of `<tr>` tag's. |
+| before-rows | `<tr>` | Util slot to render the loading/empty data text |
+| row | `<tr>` | Slot to render each table row. Note that this slot is executed for each visible row |
 | footer | `<tfoot>` | Slot to render the `tfoot` tag |
 
-The `v-slot:rows` provides the following parameters:
-* **rowsWindow** - array of items sliced by the visible window;
-* **itemSize** - is there just for utility. Should be used to set the `<tr>` height;
-* **windowStart** - starting index of input `rows` based on the visible window;
-* **windowEnd** - ending index of input `rows` based on the visible window;
+The `v-slot:row` provides the following parameters:
+* **item** - item for the current row (extracted from the input property `items`);
+* **index** - index for the current item (based on the input property `items` length);
+* **itemSize** - should be used to set the `<tr>` height;
+* **windowStart** - starting index of input `items` based on the visible window;
+* **windowEnd** - ending index of input `items` based on the visible window;
 
 
 ## Example
@@ -40,7 +49,7 @@ The `v-slot:rows` provides the following parameters:
     <vue-virtual-scroll-table
         :itemSize="64"
         :preRenderSize="5"
-        :rows="rows"
+        :items="items"
     >
         <!-- Slot to render colgroup -->
         <template v-slot:colgroup></template>
@@ -56,18 +65,18 @@ The `v-slot:rows` provides the following parameters:
         </template>
 
         <!-- Slot to render rows -->
-        <template v-slot:rows="{
+        <template v-slot:row="{
+            item,
+            index,
             itemSize,
-            rowsWindow,
             windowStart,
             windowEnd
         }">
             <tr 
-                v-for="(row, i) in rowsWindow" :key="`row-${i}`"
+                :key="`row-${item.id}`"
                 :style="`height: {itemSize}px`"
             >
-                <td> {{windowStart + i}} </td>
-                <td v-for="(cell, j) in headers" :key="`cell-${i}`"> row[j] </td>
+                <td v-for="(cell, j) in headers" :key="`cell-${item.id}-${i}`"> item[j] </td>
             </tr>
         </template>
 
@@ -78,14 +87,15 @@ export default {
     data(){
         return {
             headers: [],
-            rows: [],
+            items: [],
         }
     },
 
     beforeCreate: function(){
-        this.headers = ['idx', 'h1', 'h2', 'h3'];
-        this.rows = new Array(1000).fill({}).map(r => {
+        this.headers = ['id', 'h1', 'h2', 'h3'];
+        this.items = new Array(1000).fill({}).map((r,i) => {
             return {
+                "id": i,
                 "h1": Math.random().toString(36).substring(7);,
                 "h2": Math.random() * 2 + 1,
                 "h3": new Date(

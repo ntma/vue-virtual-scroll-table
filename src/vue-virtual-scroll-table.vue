@@ -1,6 +1,10 @@
 <template>
   <!-- Table Wrapper -->
-  <div ref="virtual_scroll_table" class="virtual-scroll-table-wrapper">
+  <div
+    ref="virtual_scroll_table"
+    class="virtual-scroll-table-wrapper"
+    @scroll.passive="onScroll"
+  >
     <table class="virtual-scroll-table">
       <!-- Slot for colgroup -->
       <slot name="colgroup"></slot>
@@ -17,16 +21,28 @@
 
       <!-- Content body -->
       <tbody>
-        <!-- slot for rows -->
+        <!-- Util slot for loading/empty text -->
         <slot
-          name="body"
+          name="before-rows"
           v-bind="{
-            rowsWindow: rowsWindow,
             itemSize: itemSize,
-            windowStart,
-            windowEnd,
           }"
         ></slot>
+
+        <!-- Rows -->
+        <template v-for="i in windowSize">
+          <!-- Slot for each row -->
+          <slot
+            name="row"
+            v-bind="{
+              index: windowStart + i - 1,
+              item: items[windowStart + i - 1],
+              itemSize,
+              windowStart,
+              windowEnd,
+            }"
+          ></slot>
+        </template>
       </tbody>
 
       <!-- body after content -->
@@ -47,11 +63,9 @@ export default {
   name: 'vue-virtual-scroll-table',
 
   props: {
-    rows: {
+    items: {
       type: Array,
-      default: function () {
-        return [];
-      },
+      required: true,
     },
 
     itemSize: {
@@ -67,33 +81,17 @@ export default {
 
   data() {
     return {
-      rowsWindow: [],
-
+      // visible window params
       windowStart: 0,
-      windowEnd: 20,
+      windowEnd: 0,
+      windowSize: 0,
+
+      // body before/after sizes
       heightStart: 0,
       heightEnd: 0,
 
+      // track last scroll (vertical)
       lastScroll: 0,
-    };
-  },
-
-  mounted: function () {
-    const vst = this.$refs.virtual_scroll_table;
-
-    vst.onscroll = () => {
-      const scrollTop = vst.scrollTop || 0;
-
-      // If the scroll is not vertical, defer...
-      if (scrollTop === this.lastScroll) {
-        return;
-      }
-
-      // Track last vertical scroll
-      this.lastScroll = scrollTop;
-
-      // recompute window
-      this.computeWindow(scrollTop);
     };
   },
 
@@ -105,14 +103,14 @@ export default {
 
   methods: {
     computeWindow: function (position, force) {
-      const { preRenderSize, itemSize, rows } = this;
+      const { preRenderSize, itemSize, items } = this;
 
       const vst = this.$refs.virtual_scroll_table;
 
       // Get the scroll component height
       const height = vst ? vst.clientHeight : itemSize * 10;
 
-      const len = rows.length;
+      const len = items.length;
 
       // Compute the number of items for the window
       const window = Math.floor(height / itemSize);
@@ -135,23 +133,46 @@ export default {
       this.$nextTick(function () {
         this.windowStart = start;
         this.windowEnd = end;
+        this.windowSize = end - start;
 
         this.heightStart = start * itemSize;
         this.heightEnd = (len - end) * itemSize;
-
-        this.rowsWindow = start >= end ? [] : rows.slice(start, end);
       });
+    },
+
+    onScroll: function () {
+      const vst = this.$refs.virtual_scroll_table;
+
+      const scrollTop = vst.scrollTop || 0;
+
+      // If the scroll is not vertical, defer...
+      if (scrollTop === this.lastScroll) {
+        return;
+      }
+
+      // Track last vertical scroll
+      this.lastScroll = scrollTop;
+
+      // recompute window
+      this.computeWindow(scrollTop);
     },
   },
 
   watch: {
-    rows: {
-      handler: function (value) {
+    items: {
+      handler: function () {
         const vst = this.$refs.virtual_scroll_table;
 
         const currScroll = vst ? vst.scrollTop : 0;
 
-        // Force window refresh which time rows change
+        this.windowStart = 0;
+        this.windowEnd = 0;
+        this.windowSize = 0;
+
+        this.heightStart = 0;
+        this.heightEnd = 0;
+
+        // Force window refresh each time items change
         this.computeWindow(currScroll, true);
       },
     },
