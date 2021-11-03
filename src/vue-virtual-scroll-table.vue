@@ -3,7 +3,7 @@
   <div
     ref="virtual_scroll_table"
     class="virtual-scroll-table-wrapper"
-    @scroll.passive="onScroll"
+    @scroll="onScroll"
   >
     <table class="virtual-scroll-table">
       <!-- Slot for colgroup -->
@@ -21,28 +21,18 @@
 
       <!-- Content body -->
       <tbody>
-        <!-- Util slot for loading/empty text -->
+        <!-- slot for rows -->
         <slot
-          name="before-rows"
+          name="body"
           v-bind="{
-            itemSize: itemSize,
+            rowSize,
+            windowStart,
+            windowEnd,
+            windowActiveStart,
+            windowActiveEnd,
+            windowSize,
           }"
         ></slot>
-
-        <!-- Rows -->
-        <template v-for="i in windowSize">
-          <!-- Slot for each row -->
-          <slot
-            name="row"
-            v-bind="{
-              index: windowStart + i - 1,
-              item: items[windowStart + i - 1],
-              itemSize,
-              windowStart,
-              windowEnd,
-            }"
-          ></slot>
-        </template>
       </tbody>
 
       <!-- body after content -->
@@ -60,15 +50,15 @@
 
 <script>
 export default {
-  name: 'vue-virtual-scroll-table',
-
   props: {
-    items: {
+    rows: {
       type: Array,
-      required: true,
+      default: function () {
+        return [];
+      },
     },
 
-    itemSize: {
+    rowSize: {
       type: Number,
       default: 48,
     },
@@ -81,12 +71,11 @@ export default {
 
   data() {
     return {
-      // visible window params
+      // rendered window indexes
       windowStart: 0,
       windowEnd: 0,
-      windowSize: 0,
 
-      // body before/after sizes
+      // size of body before/after
       heightStart: 0,
       heightEnd: 0,
 
@@ -102,44 +91,6 @@ export default {
   },
 
   methods: {
-    computeWindow: function (position, force) {
-      const { preRenderSize, itemSize, items } = this;
-
-      const vst = this.$refs.virtual_scroll_table;
-
-      // Get the scroll component height
-      const height = vst ? vst.clientHeight : itemSize * 10;
-
-      const len = items.length;
-
-      // Compute the number of items for the window
-      const window = Math.floor(height / itemSize);
-
-      // Compute the start index for the slice
-      const start = Math.max(
-        Math.floor(position / itemSize) - preRenderSize,
-        0
-      );
-
-      // Compute the end index for the slice
-      const end = Math.min(start + window + preRenderSize * 2, len);
-
-      // If the window didn't move, return unless we force the re-render
-      if (this.windowStart === start && this.windowEnd === end && !force) {
-        return;
-      }
-
-      // Update the slice in the next render
-      this.$nextTick(function () {
-        this.windowStart = start;
-        this.windowEnd = end;
-        this.windowSize = end - start;
-
-        this.heightStart = start * itemSize;
-        this.heightEnd = (len - end) * itemSize;
-      });
-    },
-
     onScroll: function () {
       const vst = this.$refs.virtual_scroll_table;
 
@@ -156,23 +107,78 @@ export default {
       // recompute window
       this.computeWindow(scrollTop);
     },
+
+    computeWindow: function (position, force) {
+      const { preRenderSize, rowSize, rows } = this;
+
+      const vst = this.$refs.virtual_scroll_table;
+
+      // Get the scroll component height
+      const height = vst ? vst.clientHeight : rowSize * 10;
+
+      const len = rows.length;
+
+      // Compute the number of items for the window
+      const window = Math.floor(height / rowSize);
+
+      // Compute the start index for the slice
+      const start = Math.max(
+        Math.floor(position / rowSize) - preRenderSize,
+        0
+      );
+
+      // Compute the end index for the slice
+      const end = Math.min(start + window + preRenderSize * 2, len);
+
+      // If the window didn't move, return unless we force the re-render
+      if (this.windowStart === start && this.windowEnd === end && !force) {
+        return;
+      }
+
+      // Update the slice in the next render
+      this.$nextTick(function () {
+        this.windowStart = start;
+        this.windowEnd = end;
+
+        this.heightStart = start * rowSize;
+        this.heightEnd = (len - end) * rowSize;
+      });
+    },
+  },
+
+  computed: {
+    // Start of visible rendered window
+    windowActiveStart: function () {
+      return this.windowStart !== 0 ? this.windowStart + this.preRenderSize : 0;
+    },
+
+    // End of visible rendered window
+    windowActiveEnd: function () {
+      return this.windowEnd !== this.rows.length
+        ? this.windowEnd - this.preRenderSize
+        : this.rows.length;
+    },
+
+    // Rendered window size
+    windowSize: function () {
+      return this.windowEnd - this.windowStart;
+    },
   },
 
   watch: {
-    items: {
-      handler: function () {
+    rows: {
+      handler: function (value) {
         const vst = this.$refs.virtual_scroll_table;
 
         const currScroll = vst ? vst.scrollTop : 0;
 
         this.windowStart = 0;
         this.windowEnd = 0;
-        this.windowSize = 0;
 
         this.heightStart = 0;
         this.heightEnd = 0;
 
-        // Force window refresh each time items change
+        // Force window refresh each time rows change
         this.computeWindow(currScroll, true);
       },
     },

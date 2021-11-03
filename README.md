@@ -1,4 +1,6 @@
-# Vue Virtual Scroll Table
+# WIP: Vue Virtual Scroll Table
+
+**Warning** This project is still in a experimental stage.
 
 Vue template component that applies a sliding window to only render visible rows.
 
@@ -19,8 +21,8 @@ Given a fixed row size and the table height, this component calculates the start
 ## Properties
 | Name | Type | Required | Default | Description |
 |-----|---|---|---|---|
-| items | Array  | yes | [] | Array of data |
-| itemSize | Number  | no | 48 | Row size in pixels. This is used to calculate the sliding window of visible rows |
+| rows | Array  | yes | [] | Array of data |
+| rowSize | Number  | no | 48 | Row size in pixels. This is used to calculate the sliding window of visible rows |
 | preRenderSize | Number | no | 5 | Number of items to render outside of the sliding window (before and after) |
 
 ## Slots
@@ -31,16 +33,15 @@ In total there are five `v-slot`'s provided where the most relevant is the `v-sl
 |-----|---|---|
 | colgroup | `<colgroup>` | Slot to render the `colgroup` tag |
 | header | `<thead>` | Slot to render the `thead` tag |
-| before-rows | `<tr>` | Util slot to render the loading/empty data text |
-| row | `<tr>` | Slot to render each table row. Note that this slot is executed for each visible row |
+| body | `<tr>` | Slot to render each table row |
 | footer | `<tfoot>` | Slot to render the `tfoot` tag |
 
 The `v-slot:row` provides the following parameters:
-* **item** - item for the current row (extracted from the input property `items`);
-* **index** - index for the current item (based on the input property `items` length);
-* **itemSize** - should be used to set the `<tr>` height;
-* **windowStart** - starting index of input `items` based on the visible window;
-* **windowEnd** - ending index of input `items` based on the visible window;
+* **rowSize** - should be used to set the `<tr>` height;
+* **windowStart** - starting index of the rendered window;
+* **windowActiveStart** - starting index of the visible window;
+* **windowEnd** - ending index of the rendered window;
+* **windowActiveEnd** - ending index of the visibile window;
 
 
 ## Example
@@ -65,21 +66,26 @@ The `v-slot:row` provides the following parameters:
         </template>
 
         <!-- Slot to render rows -->
-        <template v-slot:row="{
-            item,
-            index,
+        <template v-slot:body="{
             itemSize,
             windowStart,
-            windowEnd
+            windowEnd,
+            windowSize,
         }">
-            <tr 
-                :key="`row-${item.id}`"
-                :style="`height: {itemSize}px`"
-            >
-                <td v-for="(cell, j) in headers" :key="`cell-${item.id}-${i}`"> item[j] </td>
-            </tr>
+            <template v-for="idx in windowSize">
+                <tr 
+                    :key="`row-${items[windowStart + idx].id}`"
+                    :style="`height: {itemSize}px`"
+                >
+                    <td 
+                        v-for="(cell, j) in headers"
+                        :key="`cell-${items[windowStart + idx].id}-${j}`"
+                    >
+                        {{items[windowStart + idx][j] }}
+                    </td>
+                </tr>
+            </template>
         </template>
-
     </vue-virtual-scroll-table>
 </template>
 <script>
